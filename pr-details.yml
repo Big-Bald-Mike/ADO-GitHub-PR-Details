@@ -1,287 +1,91 @@
-name: GitHub PR Metrics Analysis
+name: WI Parent Updater
 
-# Trigger options
-trigger: none  # Manual trigger only
+# Webhook-triggered pipeline only
+trigger: none
 pr: none
 
-# Schedule to run weekly
-schedules:
-- cron: "0 9 * * 1"  # Every Monday at 9 AM UTC
-  displayName: Weekly PR Metrics Analysis
-  branches:
-    include:
-    - main
-  always: true
-
-# Pipeline parameters
+# Pipeline parameters for flexibility
 parameters:
-  - name: githubOwner
-    type: string
-    displayName: 'GitHub Organization/Owner'
-    default: ''
-  
-  - name: githubRepository
-    type: string
-    displayName: 'GitHub Repository (leave empty for all repos)'
-    default: ''
-  
-  - name: daysBack
-    type: number
-    displayName: 'Days to look back'
-    default: 30
-    values:
-    - 7
-    - 14
-    - 30
-    - 60
-    - 90
-  
-  - name: prState
-    type: string
-    displayName: 'PR State Filter'
-    default: 'all'
-    values:
-    - all
-    - open
-    - closed
-  
-  - name: includeDetails
-    type: boolean
-    displayName: 'Include detailed PR information'
-    default: true
-  
-  - name: includeDrafts
-    type: boolean
-    displayName: 'Include draft PRs'
-    default: false
-  
-  - name: maxResults
-    type: number
-    displayName: 'Maximum PRs per repository'
-    default: 100
-
-# Variable groups for secrets and configuration
-variables:
-  - group: 'GitHub-Integration'  # Contains: githubToken, defaultOwner
-  - name: reportPath
-    value: '$(Build.ArtifactStagingDirectory)/github-pr-metrics.csv'
   - name: scriptPath
-    value: 'scripts/Get-GitHubPRMetrics.ps1'
+    type: string
+    default: 'ADO-Pipelines/scripts/WI-Updater.ps1'
+    displayName: 'Path to PowerShell script'
+  
+  - name: enableVerboseLogging
+    type: boolean
+    default: false
+    displayName: 'Enable verbose logging'
+  
+  - name: whatIfMode
+    type: boolean
+    default: false
+    displayName: 'Run in What-If mode (no actual updates)'
+
+# Webhook resource
+resources:
+  webhooks:
+    - webhook: WIParent      # Addressable alias for this YAML
+      connection: WIParent   # Incoming webhook service connection name in ADO
+
+# Variable groups for better secret management
+variables:
+  - group: 'ADO-WorkItem-Variables'  # Contains: org, project
+  - name: scriptArgs
+    value: >
+      -workitemID ${{ parameters.WIParent.resource.workItemId }}
+      -token $(token)
+      -org $(org)
+      -project $(project)
+      ${{ eq(parameters.enableVerboseLogging, true) && '-Verbose' || '' }}
+      ${{ eq(parameters.whatIfMode, true) && '-WhatIf' || '' }}
 
 stages:
-- stage: AnalyzePRMetrics
-  displayName: 'Analyze GitHub PR Metrics'
+- stage: UpdateParentWorkItem
+  displayName: 'Update Parent Work Item'
   jobs:
-  - job: GenerateMetrics
-    displayName: 'Generate PR Metrics Report'
+  - job: UpdateParent
+    displayName: 'Process Work Item Update'
     pool:
-      vmImage: 'windows-latest'
+      vmImage: 'windows-latest'  # or 'ubuntu-latest' if you prefer
     
     steps:
     - checkout: self
       displayName: 'Checkout repository'
     
-    # Validate parameters
+    # Validate webhook payload
     - task: PowerShell@2
-      displayName: 'Validate Parameters'
+      displayName: 'Validate Webhook Payload'
       inputs:
         targetType: 'inline'
         script: |
-          $owner = '${{ parameters.githubOwner }}'
-          if (-not $owner) {
-            $owner = '$(defaultOwner)'
-          }
-          
-          if (-not $owner) {
-            Write-Error "GitHub owner/organization must be specified either as parameter or in variable group"
+          $workItemId = '${{ parameters.WIParent.resource.workItemId }}'
+          if (-not ($workItemId -match '^\d+$')) {
+            Write-Error "Invalid work item ID received: $workItemId"
             exit 1
           }
-          
-          Write-Host "✅ GitHub Owner: $owner"
-          Write-Host "✅ Repository: $(if ('${{ parameters.githubRepository }}') { '${{ parameters.githubRepository }}' } else { 'All accessible repositories' })"
-          Write-Host "✅ Days back: ${{ parameters.daysBack }}"
-          Write-Host "✅ State filter: ${{ parameters.prState }}"
-          
-          # Set variables for subsequent tasks
-          Write-Host "##vso[task.setvariable variable=effectiveOwner]$owner"
+          Write-Host "✅ Valid work item ID received: $workItemId"
         failOnStderr: true
     
-    # Create output directory
+    # Main script execution
     - task: PowerShell@2
-      displayName: 'Prepare Output Directory'
+      displayName: 'Update Parent Work Item'
       inputs:
-        targetType: 'inline'
-        script: |
-          $outputDir = '$(Build.ArtifactStagingDirectory)'
-          if (-not (Test-Path $outputDir)) {
-            New-Item -Path $outputDir -ItemType Directory -Force
-            Write-Host "Created output directory: $outputDir"
-          }
-          
-          # Create scripts directory if it doesn't exist
-          $scriptsDir = Join-Path '$(Build.SourcesDirectory)' 'scripts'
-          if (-not (Test-Path $scriptsDir)) {
-            New-Item -Path $scriptsDir -ItemType Directory -Force
-            Write-Host "Created scripts directory: $scriptsDir"
-          }
-        failOnStderr: false
-    
-    # Run PR metrics analysis
-    - task: PowerShell@2
-      displayName: 'Analyze GitHub PR Metrics'
-      inputs:
-        filePath: $(scriptPath)
-        arguments: |
-          -owner "$(effectiveOwner)"
-          -repository "${{ parameters.githubRepository }}"
-          -token "$(githubToken)"
-          -days ${{ parameters.daysBack }}
-          -state "${{ parameters.prState }}"
-          -outputPath "$(reportPath)"
-          -maxResults ${{ parameters.maxResults }}
-          ${{ if eq(parameters.includeDetails, true) }}-includeDetails
-          ${{ if eq(parameters.includeDrafts, true) }}-includeDrafts
-          -Verbose
-        failOnStderr: false
-        pwsh: true
+        filePath: ${{ parameters.scriptPath }}
+        arguments: $(scriptArgs)
+        failOnStderr: true
+        pwsh: true  # Use PowerShell Core for better cross-platform support
       env:
-        GITHUB_TOKEN: $(githubToken)
-      timeoutInMinutes: 30
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)  # For additional auth if needed
+      timeoutInMinutes: 10
+      retryCountOnTaskFailure: 1
     
-    # Generate summary report
+    # Notification on failure
     - task: PowerShell@2
-      displayName: 'Generate Summary Report'
+      displayName: 'Notify on Failure'
+      condition: failed()
       inputs:
         targetType: 'inline'
         script: |
-          $csvPath = '$(reportPath)'
-          $summaryPath = '$(Build.ArtifactStagingDirectory)/pr-metrics-summary.md'
-          
-          if (Test-Path $csvPath) {
-            $data = Import-Csv $csvPath
-            
-            $summary = @"
-          # GitHub PR Metrics Analysis Report
-          
-          **Generated:** $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')
-          **Organization:** $(effectiveOwner)
-          **Repository:** $(if ('${{ parameters.githubRepository }}') { '${{ parameters.githubRepository }}' } else { 'All accessible repositories' })
-          **Analysis Period:** Last ${{ parameters.daysBack }} days
-          **State Filter:** ${{ parameters.prState }}
-          
-          ## Summary Statistics
-          
-          - **Total PRs Analyzed:** $($data.Count)
-          - **Open PRs:** $($data | Where-Object State -eq 'open' | Measure-Object | Select-Object -ExpandProperty Count)
-          - **Closed PRs:** $($data | Where-Object State -eq 'closed' | Measure-Object | Select-Object -ExpandProperty Count)
-          - **Merged PRs:** $($data | Where-Object MergedAt -ne '' | Measure-Object | Select-Object -ExpandProperty Count)
-          
-          "@
-          
-          # Calculate averages
-          $closedPRs = $data | Where-Object { $_.State -eq 'closed' -and $_.TimeToClose -ne '' }
-          if ($closedPRs.Count -gt 0) {
-            $avgClose = ($closedPRs | Measure-Object -Property TimeToClose -Average).Average
-            $summary += "`n- **Average Time to Close:** $([math]::Round($avgClose, 2)) hours"
-          }
-          
-          $mergedPRs = $data | Where-Object { $_.MergedAt -ne '' -and $_.TimeToMerge -ne '' }
-          if ($mergedPRs.Count -gt 0) {
-            $avgMerge = ($mergedPRs | Measure-Object -Property TimeToMerge -Average).Average
-            $summary += "`n- **Average Time to Merge:** $([math]::Round($avgMerge, 2)) hours"
-          }
-          
-          $reviewedPRs = $data | Where-Object { $_.TimeToFirstReview -ne '' }
-          if ($reviewedPRs.Count -gt 0) {
-            $avgReview = ($reviewedPRs | Measure-Object -Property TimeToFirstReview -Average).Average
-            $summary += "`n- **Average Time to First Review:** $([math]::Round($avgReview, 2)) hours"
-          }
-          
-          # Top repositories by PR count
-          $repoStats = $data | Group-Object Repository | Sort-Object Count -Descending | Select-Object -First 10
-          if ($repoStats.Count -gt 1) {
-            $summary += "`n`n## Top Repositories by PR Count`n"
-            foreach ($repo in $repoStats) {
-              $summary += "- **$($repo.Name):** $($repo.Count) PRs`n"
-            }
-          }
-          
-          # Top contributors
-          $contributorStats = $data | Group-Object Author | Sort-Object Count -Descending | Select-Object -First 10
-          if ($contributorStats.Count -gt 0) {
-            $summary += "`n## Top Contributors`n"
-            foreach ($contributor in $contributorStats) {
-              $summary += "- **$($contributor.Name):** $($contributor.Count) PRs`n"
-            }
-          }
-          
-          $summary | Out-File -FilePath $summaryPath -Encoding UTF8
-          Write-Host "Summary report generated: $summaryPath"
-          
-          # Display summary in pipeline logs
-          Write-Host "##[section]PR Metrics Summary"
-          Write-Host $summary
-          } else {
-            Write-Warning "No CSV file found at $csvPath"
-          }
+          Write-Host "##vso[task.logissue type=error]Parent work item update failed for work item ${{ parameters.WIParent.resource.workItemId }}"
+          # Add additional notification logic here (Teams, Slack, email, etc.)
         failOnStderr: false
-        pwsh: true
-    
-    # Publish artifacts
-    - task: PublishBuildArtifacts@1
-      displayName: 'Publish PR Metrics Report'
-      inputs:
-        pathToPublish: '$(Build.ArtifactStagingDirectory)'
-        artifactName: 'github-pr-metrics'
-        publishLocation: 'Container'
-      condition: always()
-    
-    # Send notification (optional)
-    - task: PowerShell@2
-      displayName: 'Send Notification'
-      condition: and(succeeded(), ne(variables['Build.Reason'], 'Manual'))
-      inputs:
-        targetType: 'inline'
-        script: |
-          # Add your notification logic here
-          # Examples: Teams webhook, Slack, email, etc.
-          
-          $webhookUrl = '$(teamsWebhookUrl)'  # Add to variable group if needed
-          if ($webhookUrl) {
-            $message = @{
-              text = "GitHub PR Metrics analysis completed for $(effectiveOwner). Check the build artifacts for detailed report."
-              title = "PR Metrics Analysis Complete"
-            } | ConvertTo-Json
-            
-            try {
-              Invoke-RestMethod -Uri $webhookUrl -Method Post -Body $message -ContentType 'application/json'
-              Write-Host "Notification sent successfully"
-            } catch {
-              Write-Warning "Failed to send notification: $_"
-            }
-          }
-        failOnStderr: false
-
-  # Optional: Deploy report to web location
-  - job: DeployReport
-    displayName: 'Deploy Report to Web'
-    dependsOn: GenerateMetrics
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-    pool:
-      vmImage: 'ubuntu-latest'
-    
-    steps:
-    - download: current
-      artifact: 'github-pr-metrics'
-      displayName: 'Download artifacts'
-    
-    - task: AzureFileCopy@4
-      displayName: 'Upload to Azure Storage'
-      inputs:
-        SourcePath: '$(Pipeline.Workspace)/github-pr-metrics/*'
-        azureSubscription: '$(azureServiceConnection)'  # Add to variable group
-        Destination: 'AzureBlob'
-        storage: '$(storageAccountName)'  # Add to variable group
-        ContainerName: 'reports'
-        BlobPrefix: 'github-pr-metrics/$(Build.BuildNumber)/'
-      condition: and(succeeded(), ne(variables['storageAccountName'], ''))
