@@ -131,7 +131,7 @@ stages:
       displayName: 'Analyze GitHub PR Metrics'
       inputs:
         filePath: $(scriptPath)
-        arguments: >
+        arguments: |
           -owner "$(effectiveOwner)"
           -repository "${{ parameters.githubRepository }}"
           -token "$(githubToken)"
@@ -139,8 +139,8 @@ stages:
           -state "${{ parameters.prState }}"
           -outputPath "$(reportPath)"
           -maxResults ${{ parameters.maxResults }}
-          ${{ eq(parameters.includeDetails, true) && '-includeDetails' || '' }}
-          ${{ eq(parameters.includeDrafts, true) && '-includeDrafts' || '' }}
+          ${{ if eq(parameters.includeDetails, true) }}-includeDetails
+          ${{ if eq(parameters.includeDrafts, true) }}-includeDrafts
           -Verbose
         failOnStderr: false
         pwsh: true
