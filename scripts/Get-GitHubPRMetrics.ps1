@@ -258,16 +258,16 @@ function Get-GitHubRepositories {
             }
         }
         
-        if ($response.Count -eq 0) { break }
+        if (@($response).Count -eq 0) { break }
         
         $repos += $response
         $page++
         
-        Write-PipelineLog "Retrieved $($repos.Count) repositories so far..." -Level Debug
+        Write-PipelineLog "Retrieved $(@($repos).Count) repositories so far..." -Level Debug
         
-    } while ($response.Count -eq $perPage)
+    } while (@($response).Count -eq $perPage)
     
-    Write-PipelineLog "Found $($repos.Count) total repositories" -Level Success
+    Write-PipelineLog "Found $(@($repos).Count) total repositories" -Level Success
     return $repos
 }
 
@@ -338,8 +338,8 @@ function ConvertTo-PRMetrics {
         TimeToMerge = ''
         TimeToFirstReview = ''
         TimeToFirstComment = ''
-        TotalReviews = $Details.Reviews.Count
-        TotalComments = ($Details.IssueComments.Count + $Details.ReviewComments.Count)
+        TotalReviews = @($Details.Reviews).Count
+        TotalComments = (@($Details.IssueComments).Count + @($Details.ReviewComments).Count)
         Additions = $PullRequest.additions
         Deletions = $PullRequest.deletions
         ChangedFiles = $PullRequest.changed_files
@@ -361,7 +361,7 @@ function ConvertTo-PRMetrics {
     }
     
     # Time to first review
-    if ($Details.Reviews.Count -gt 0) {
+    if (@($Details.Reviews).Count -gt 0) {
         $firstReview = $Details.Reviews | Sort-Object submitted_at | Select-Object -First 1
         $firstReviewTime = [DateTime]::Parse($firstReview.submitted_at)
         $metrics.TimeToFirstReview = [math]::Round(($firstReviewTime - $createdAt).TotalHours, 2)
@@ -372,7 +372,7 @@ function ConvertTo-PRMetrics {
     $allComments += $Details.IssueComments | ForEach-Object { [DateTime]::Parse($_.created_at) }
     $allComments += $Details.ReviewComments | ForEach-Object { [DateTime]::Parse($_.created_at) }
     
-    if ($allComments.Count -gt 0) {
+    if (@($allComments).Count -gt 0) {
         $firstCommentTime = $allComments | Sort-Object | Select-Object -First 1
         $metrics.TimeToFirstComment = [math]::Round(($firstCommentTime - $createdAt).TotalHours, 2)
     }
