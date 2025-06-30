@@ -324,14 +324,14 @@ function ConvertTo-PRMetrics {
     $updatedAt = [DateTime]::Parse($PullRequest.updated_at)
     
     $metrics = [PSCustomObject]@{
-        Repository = $PullRequest.base.repo.name
-        PullNumber = $PullRequest.number
-        Title = $PullRequest.title -replace '"', '""'  # Escape quotes for CSV
-        Author = $PullRequest.user.login
-        State = $PullRequest.state
-        IsDraft = $PullRequest.draft
-        CreatedAt = $createdAt.ToString('yyyy-MM-dd HH:mm:ss')
-        UpdatedAt = $updatedAt.ToString('yyyy-MM-dd HH:mm:ss')
+        Repository = if ($PullRequest.base -and $PullRequest.base.repo -and $PullRequest.base.repo.PSObject.Properties['name']) { $PullRequest.base.repo.name } else { '' }
+        PullNumber = if ($PullRequest.PSObject.Properties['number']) { $PullRequest.number } else { '' }
+        Title = if ($PullRequest.PSObject.Properties['title']) { $PullRequest.title -replace '"', '""' } else { '' }  # Escape quotes for CSV
+        Author = if ($PullRequest.user -and $PullRequest.user.PSObject.Properties['login']) { $PullRequest.user.login } else { '' }
+        State = if ($PullRequest.PSObject.Properties['state']) { $PullRequest.state } else { '' }
+        IsDraft = if ($PullRequest.PSObject.Properties['draft']) { $PullRequest.draft } else { $false }
+        CreatedAt = if ($PullRequest.PSObject.Properties['created_at']) { $createdAt.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+        UpdatedAt = if ($PullRequest.PSObject.Properties['updated_at']) { $updatedAt.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
         ClosedAt = ''
         MergedAt = ''
         TimeToClose = ''
@@ -344,17 +344,17 @@ function ConvertTo-PRMetrics {
         Deletions = $PullRequest.PSObject.Properties['deletions']    ? $PullRequest.deletions    : 0
         ChangedFiles = $PullRequest.PSObject.Properties['changed_files'] ? $PullRequest.changed_files : 0
         Commits = $PullRequest.PSObject.Properties['commits']      ? $PullRequest.commits      : 0
-        Url = $PullRequest.html_url
+        Url = if ($PullRequest.PSObject.Properties['html_url']) { $PullRequest.html_url } else { '' }
     }
     
     # Calculate time-based metrics
-    if ($PullRequest.closed_at) {
+    if ($PullRequest.PSObject.Properties['closed_at'] -and $PullRequest.closed_at) {
         $closedAt = [DateTime]::Parse($PullRequest.closed_at)
         $metrics.ClosedAt = $closedAt.ToString('yyyy-MM-dd HH:mm:ss')
         $metrics.TimeToClose = [math]::Round(($closedAt - $createdAt).TotalHours, 2)
     }
     
-    if ($PullRequest.merged_at) {
+    if ($PullRequest.PSObject.Properties['merged_at'] -and $PullRequest.merged_at) {
         $mergedAt = [DateTime]::Parse($PullRequest.merged_at)
         $metrics.MergedAt = $mergedAt.ToString('yyyy-MM-dd HH:mm:ss')
         $metrics.TimeToMerge = [math]::Round(($mergedAt - $createdAt).TotalHours, 2)
@@ -370,8 +370,8 @@ function ConvertTo-PRMetrics {
     
     # Time to first comment
     $allComments = @()
-    $allComments += $Details.IssueComments | ForEach-Object { [DateTime]::Parse($_.created_at) }
-    $allComments += $Details.ReviewComments | ForEach-Object { [DateTime]::Parse($_.created_at) }
+    $allComments += $Details.IssueComments | Where-Object { $_.PSObject.Properties['created_at'] } | ForEach-Object { [DateTime]::Parse($_.created_at) }
+    $allComments += $Details.ReviewComments | Where-Object { $_.PSObject.Properties['created_at'] } | ForEach-Object { [DateTime]::Parse($_.created_at) }
     
     if (@($allComments).Count -gt 0) {
         $firstCommentTime = $allComments | Sort-Object | Select-Object -First 1
