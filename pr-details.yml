@@ -359,8 +359,11 @@ stages:
           
           🔗 **Download artifacts from the build summary page**
           "@
-          
-          Write-Host "##vso[task.uploadsummary]$buildSummary"
+
+          $summaryPath = "$(Build.ArtifactStagingDirectory)/pr-metrics-build-summary.md"
+          $buildSummary | Out-File -FilePath $summaryPath -Encoding UTF8
+
+          Write-Host "##vso[task.uploadsummary]$summaryPath"
           Write-Host "✅ Build summary updated"
         failOnStderr: false
       condition: always()
