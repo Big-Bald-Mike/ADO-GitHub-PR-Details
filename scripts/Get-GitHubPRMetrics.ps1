@@ -361,8 +361,9 @@ function ConvertTo-PRMetrics {
     }
     
     # Time to first review
-    if (@($Details.Reviews).Count -gt 0) {
-        $firstReview = $Details.Reviews | Sort-Object submitted_at | Select-Object -First 1
+    $submittedReviews = $Details.Reviews | Where-Object { $_.PSObject.Properties['submitted_at'] }
+    if (@($submittedReviews).Count -gt 0) {
+        $firstReview = $submittedReviews | Sort-Object submitted_at | Select-Object -First 1
         $firstReviewTime = [DateTime]::Parse($firstReview.submitted_at)
         $metrics.TimeToFirstReview = [math]::Round(($firstReviewTime - $createdAt).TotalHours, 2)
     }
