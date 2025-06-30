@@ -506,7 +506,7 @@ try {
         Write-PipelineLog "Merged PRs: $($mergedPRs.Count)" -Level Info
         
         if ($closedPRs.Count -gt 0) {
-            $closedTimes = @($closedPRs | Where-Object { $_.TimeToClose -ne '' -and ($_ .TimeToClose -is [double] -or $_.TimeToClose -is [int]) } | ForEach-Object { [double]$_?.TimeToClose })
+            $closedTimes = @($closedPRs | Where-Object { $_.TimeToClose -ne '' -and ($_.TimeToClose -as [double]) -ne $null } | ForEach-Object { [double]$_.TimeToClose })
             if ($closedTimes.Count -gt 0) {
                 $avgTimeToClose = ($closedTimes | Measure-Object -Average).Average
                 if ($avgTimeToClose) {
@@ -516,7 +516,7 @@ try {
         }
         
         if ($mergedPRs.Count -gt 0) {
-            $mergeTimes = @($mergedPRs | Where-Object { $_.TimeToMerge -ne '' -and ($_ .TimeToMerge -is [double] -or $_.TimeToMerge -is [int]) } | ForEach-Object { [double]$_?.TimeToMerge })
+            $mergeTimes = @($mergedPRs | Where-Object { $_.TimeToMerge -ne '' -and ($_.TimeToMerge -as [double]) -ne $null } | ForEach-Object { [double]$_.TimeToMerge })
             if ($mergeTimes.Count -gt 0) {
                 $avgTimeToMerge = ($mergeTimes | Measure-Object -Average).Average
                 if ($avgTimeToMerge) {
