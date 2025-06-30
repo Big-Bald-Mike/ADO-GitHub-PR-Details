@@ -348,10 +348,10 @@ stages:
           $buildSummary = @"
           ## 📊 GitHub PR Metrics Analysis Complete
           
-          - **Total PRs Analyzed:** $(totalPRs)
-          - **Open PRs:** $(openPRs)  
-          - **Closed PRs:** $(closedPRs)
-          - **Merged PRs:** $(mergedPRs)
+          - **Total PRs Analyzed:** $env:totalPRs
+          - **Open PRs:** $env:openPRs  
+          - **Closed PRs:** $env:closedPRs
+          - **Merged PRs:** $env:mergedPRs
           
           📁 **Artifacts Published:**
           - CSV Report: github-pr-metrics.csv

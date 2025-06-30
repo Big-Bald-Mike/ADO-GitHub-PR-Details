@@ -497,23 +497,23 @@ try {
         Write-PipelineLog "Analysis Summary" -Level Section
         Write-PipelineLog "Total PRs analyzed: $($allMetrics.Count)" -Level Info
         
-        $openPRs = $allMetrics | Where-Object { $_.State -eq 'open' }
-        $closedPRs = $allMetrics | Where-Object { $_.State -eq 'closed' }
-        $mergedPRs = $allMetrics | Where-Object { $_.MergedAt -ne '' }
+        $openPRs = @($allMetrics | Where-Object { $_.State -eq 'open' })
+        $closedPRs = @($allMetrics | Where-Object { $_.State -eq 'closed' })
+        $mergedPRs = @($allMetrics | Where-Object { $_.MergedAt -ne '' })
         
         Write-PipelineLog "Open PRs: $($openPRs.Count)" -Level Info
         Write-PipelineLog "Closed PRs: $($closedPRs.Count)" -Level Info
         Write-PipelineLog "Merged PRs: $($mergedPRs.Count)" -Level Info
         
         if ($closedPRs.Count -gt 0) {
-            $avgTimeToClose = ($closedPRs | Where-Object { $_.TimeToClose -ne '' } | Measure-Object -Property TimeToClose -Average).Average
+            $avgTimeToClose = (@($closedPRs | Where-Object { $_.TimeToClose -ne '' }) | Measure-Object -Property TimeToClose -Average).Average
             if ($avgTimeToClose) {
                 Write-PipelineLog "Average time to close: $([math]::Round($avgTimeToClose, 2)) hours" -Level Info
             }
         }
         
         if ($mergedPRs.Count -gt 0) {
-            $avgTimeToMerge = ($mergedPRs | Where-Object { $_.TimeToMerge -ne '' } | Measure-Object -Property TimeToMerge -Average).Average
+            $avgTimeToMerge = (@($mergedPRs | Where-Object { $_.TimeToMerge -ne '' }) | Measure-Object -Property TimeToMerge -Average).Average
             if ($avgTimeToMerge) {
                 Write-PipelineLog "Average time to merge: $([math]::Round($avgTimeToMerge, 2)) hours" -Level Info
             }
