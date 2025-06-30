@@ -324,14 +324,14 @@ function ConvertTo-PRMetrics {
     $updatedAt = [DateTime]::Parse($PullRequest.updated_at)
     
     $metrics = [PSCustomObject]@{
-        Repository = if ($PullRequest.base -and $PullRequest.base.repo -and $PullRequest.base.repo.PSObject.Properties['name']) { $PullRequest.base.repo.name } else { '' }
-        PullNumber = if ($PullRequest.PSObject.Properties['number']) { $PullRequest.number } else { '' }
-        Title = if ($PullRequest.PSObject.Properties['title']) { $PullRequest.title -replace '"', '""' } else { '' }  # Escape quotes for CSV
-        Author = if ($PullRequest.user -and $PullRequest.user.PSObject.Properties['login']) { $PullRequest.user.login } else { '' }
-        State = if ($PullRequest.PSObject.Properties['state']) { $PullRequest.state } else { '' }
-        IsDraft = if ($PullRequest.PSObject.Properties['draft']) { $PullRequest.draft } else { $false }
-        CreatedAt = if ($PullRequest.PSObject.Properties['created_at']) { $createdAt.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
-        UpdatedAt = if ($PullRequest.PSObject.Properties['updated_at']) { $updatedAt.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+        Repository = if ($PullRequest.base -and $PullRequest.base.repo -and ($PullRequest.base.repo -is [psobject]) -and $PullRequest.base.repo.PSObject.Properties['name']) { $PullRequest.base.repo.name } else { '' }
+        PullNumber = if (($PullRequest -is [psobject]) -and $PullRequest.PSObject.Properties['number']) { $PullRequest.number } else { '' }
+        Title = if (($PullRequest -is [psobject]) -and $PullRequest.PSObject.Properties['title']) { $PullRequest.title -replace '"', '""' } else { '' }  # Escape quotes for CSV
+        Author = if ($PullRequest.user -and ($PullRequest.user -is [psobject]) -and $PullRequest.user.PSObject.Properties['login']) { $PullRequest.user.login } else { '' }
+        State = if (($PullRequest -is [psobject]) -and $PullRequest.PSObject.Properties['state']) { $PullRequest.state } else { '' }
+        IsDraft = if (($PullRequest -is [psobject]) -and $PullRequest.PSObject.Properties['draft']) { $PullRequest.draft } else { $false }
+        CreatedAt = if (($PullRequest -is [psobject]) -and $PullRequest.PSObject.Properties['created_at']) { $createdAt.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
+        UpdatedAt = if (($PullRequest -is [psobject]) -and $PullRequest.PSObject.Properties['updated_at']) { $updatedAt.ToString('yyyy-MM-dd HH:mm:ss') } else { '' }
         ClosedAt = ''
         MergedAt = ''
         TimeToClose = ''
@@ -340,28 +340,28 @@ function ConvertTo-PRMetrics {
         TimeToFirstComment = ''
         TotalReviews = @($Details.Reviews).Count
         TotalComments = (@($Details.IssueComments).Count + @($Details.ReviewComments).Count)
-        Additions = $PullRequest.PSObject.Properties['additions']    ? $PullRequest.additions    : 0
-        Deletions = $PullRequest.PSObject.Properties['deletions']    ? $PullRequest.deletions    : 0
-        ChangedFiles = $PullRequest.PSObject.Properties['changed_files'] ? $PullRequest.changed_files : 0
-        Commits = $PullRequest.PSObject.Properties['commits']      ? $PullRequest.commits      : 0
-        Url = if ($PullRequest.PSObject.Properties['html_url']) { $PullRequest.html_url } else { '' }
+        Additions = (($PullRequest -is [psobject]) -and $PullRequest.PSObject.Properties['additions'])    ? $PullRequest.additions    : 0
+        Deletions = (($PullRequest -is [psobject]) -and $PullRequest.PSObject.Properties['deletions'])    ? $PullRequest.deletions    : 0
+        ChangedFiles = (($PullRequest -is [psobject]) -and $PullRequest.PSObject.Properties['changed_files']) ? $PullRequest.changed_files : 0
+        Commits = (($PullRequest -is [psobject]) -and $PullRequest.PSObject.Properties['commits'])      ? $PullRequest.commits      : 0
+        Url = if (($PullRequest -is [psobject]) -and $PullRequest.PSObject.Properties['html_url']) { $PullRequest.html_url } else { '' }
     }
     
     # Calculate time-based metrics
-    if ($PullRequest.PSObject.Properties['closed_at'] -and $PullRequest.closed_at) {
+    if (($PullRequest -is [psobject]) -and $PullRequest.PSObject.Properties['closed_at'] -and $PullRequest.closed_at) {
         $closedAt = [DateTime]::Parse($PullRequest.closed_at)
         $metrics.ClosedAt = $closedAt.ToString('yyyy-MM-dd HH:mm:ss')
         $metrics.TimeToClose = [math]::Round(($closedAt - $createdAt).TotalHours, 2)
     }
     
-    if ($PullRequest.PSObject.Properties['merged_at'] -and $PullRequest.merged_at) {
+    if (($PullRequest -is [psobject]) -and $PullRequest.PSObject.Properties['merged_at'] -and $PullRequest.merged_at) {
         $mergedAt = [DateTime]::Parse($PullRequest.merged_at)
         $metrics.MergedAt = $mergedAt.ToString('yyyy-MM-dd HH:mm:ss')
         $metrics.TimeToMerge = [math]::Round(($mergedAt - $createdAt).TotalHours, 2)
     }
     
     # Time to first review
-    $submittedReviews = $Details.Reviews | Where-Object { $_.PSObject.Properties['submitted_at'] }
+    $submittedReviews = $Details.Reviews | Where-Object { ($_ -is [psobject]) -and $_.PSObject.Properties['submitted_at'] }
     if (@($submittedReviews).Count -gt 0) {
         $firstReview = $submittedReviews | Sort-Object submitted_at | Select-Object -First 1
         $firstReviewTime = [DateTime]::Parse($firstReview.submitted_at)
@@ -370,8 +370,8 @@ function ConvertTo-PRMetrics {
     
     # Time to first comment
     $allComments = @()
-    $allComments += $Details.IssueComments | Where-Object { $_.PSObject.Properties['created_at'] } | ForEach-Object { [DateTime]::Parse($_.created_at) }
-    $allComments += $Details.ReviewComments | Where-Object { $_.PSObject.Properties['created_at'] } | ForEach-Object { [DateTime]::Parse($_.created_at) }
+    $allComments += $Details.IssueComments | Where-Object { ($_ -is [psobject]) -and $_.PSObject.Properties['created_at'] } | ForEach-Object { [DateTime]::Parse($_.created_at) }
+    $allComments += $Details.ReviewComments | Where-Object { ($_ -is [psobject]) -and $_.PSObject.Properties['created_at'] } | ForEach-Object { [DateTime]::Parse($_.created_at) }
     
     if (@($allComments).Count -gt 0) {
         $firstCommentTime = $allComments | Sort-Object | Select-Object -First 1
