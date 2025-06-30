@@ -340,10 +340,10 @@ function ConvertTo-PRMetrics {
         TimeToFirstComment = ''
         TotalReviews = @($Details.Reviews).Count
         TotalComments = (@($Details.IssueComments).Count + @($Details.ReviewComments).Count)
-        Additions = $PullRequest.additions
-        Deletions = $PullRequest.deletions
-        ChangedFiles = $PullRequest.changed_files
-        Commits = $PullRequest.commits
+        Additions = $PullRequest.PSObject.Properties['additions']    ? $PullRequest.additions    : 0
+        Deletions = $PullRequest.PSObject.Properties['deletions']    ? $PullRequest.deletions    : 0
+        ChangedFiles = $PullRequest.PSObject.Properties['changed_files'] ? $PullRequest.changed_files : 0
+        Commits = $PullRequest.PSObject.Properties['commits']      ? $PullRequest.commits      : 0
         Url = $PullRequest.html_url
     }
     
