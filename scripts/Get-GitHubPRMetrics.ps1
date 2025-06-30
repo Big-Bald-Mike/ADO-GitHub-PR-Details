@@ -427,7 +427,7 @@ try {
             
             do {
                 $uri = "https://api.github.com/repos/$owner/$($repo.name)/pulls?state=$state&sort=updated&direction=desc&per_page=$perPage&page=$page"
-                $prs = Invoke-GitHubApiWithRetry -Uri $uri -Headers $headers
+                $prs = @(Invoke-GitHubApiWithRetry -Uri $uri -Headers $headers)
                 
                 if ($prs.Count -eq 0) { break }
                 
